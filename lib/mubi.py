@@ -3,41 +3,28 @@ A module to handle requests to the MUBI API
 """
 import datetime
 import logging
-import requests
+import json
 
-#pip imports
+import requests
 from dateutil.parser import parse
 
 logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 
-BASE_URL = 'https://mubi.com/services/android/films?country={}'
+BASE_URL = 'https://mubi.com/showing'
+
 
 class MubiUtil:
     """A class that handles calls to the Mubi api"""
-    def __init__(self, config):
-        self._api_url = BASE_URL.format(config['mubi_country_code'])
 
     def _fetch_raw_film_listings(self):
-        response = requests.get(self._api_url)
+        response = requests.get(BASE_URL).text
+        response = response.split('</script><script nomodule="" src="/_next/',
+                    2)[0].split('script id="__NEXT_DATA__" type="application/json">', 2)[1]
+        data = json.loads(response)
+        return data['props']['initialState']['filmProgramming']['filmProgrammingsByChannel']['0']
 
-        if response.status_code != 200:
-            logger.error('Recieved http %s response. \n %s',
-                         response.status_code,
-                         response.text)
-
-            raise Exception('Bad Response from Mubi')
-        return response
-
-    def get_film_json(self):
-        """ returns all film data as json"""
-        raw_response = self._fetch_raw_film_listings()
-        return raw_response.json()
-    @staticmethod
-    def get_leaving(film_json):
+    def get_leaving(self):
         """ returns the film leaving mubi today based on current date"""
-        today = datetime.date.today()
-        for film in reversed(film_json):
-            if parse(film['expires_at']).date() == today:
-                return film
-        return None
+
+        return self._fetch_raw_film_listings()[-1]['film']
